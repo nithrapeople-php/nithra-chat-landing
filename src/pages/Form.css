@@ -1,0 +1,113 @@
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.form input,
+.form textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.form input:focus,
+.form textarea:focus {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.form__subdomain {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.form__subdomain span {
+  color: var(--muted);
+  font-weight: 550;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.form__hint,
+.form__error,
+.form__success,
+.form__footer-note {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.form__hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.form__hint code {
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+}
+
+.form__error {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.form__success {
+  color: var(--accent-2);
+  font-weight: 650;
+  padding: 1rem 0;
+}
+
+.form__footer-note {
+  margin-top: 1.25rem;
+  color: var(--muted);
+}
+
+.form__footer-note a {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.form__tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.form__tabs button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.55rem;
+  cursor: pointer;
+}
+
+.form__tabs button.is-active {
+  background: #fff;
+  color: var(--ink);
+}
