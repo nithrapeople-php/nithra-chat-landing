@@ -12,10 +12,22 @@
   gap: 2rem;
 }
 
-.footer__brand strong {
+.footer__brand strong,
+.footer__brand-row {
   font-family: var(--font-display);
   font-size: 1.25rem;
   letter-spacing: -0.03em;
+}
+
+.footer__brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.footer__brand-row img {
+  border-radius: 0.4rem;
+  object-fit: cover;
 }
 
 .footer__brand p {

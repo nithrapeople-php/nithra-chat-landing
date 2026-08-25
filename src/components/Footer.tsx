@@ -7,7 +7,10 @@ export function Footer() {
     <footer className="footer">
       <div className="footer__inner">
         <div className="footer__brand">
-          <strong>{brand.name}</strong>
+          <strong className="footer__brand-row">
+            <img src={brand.logoSrc} alt="" width={28} height={28} />
+            {brand.name}
+          </strong>
           <p>{brand.tagline}</p>
         </div>
         <div className="footer__cols">
@@ -26,7 +29,7 @@ export function Footer() {
       </div>
       <div className="footer__legal">
         <span>© {new Date().getFullYear()} {brand.name}</span>
-        <span>Built for Frappe multi-tenant SaaS</span>
+        <span>Team messenger & collaboration</span>
       </div>
     </footer>
   )

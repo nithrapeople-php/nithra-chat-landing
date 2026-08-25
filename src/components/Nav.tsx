@@ -7,7 +7,13 @@ export function Nav() {
     <header className="nav">
       <div className="nav__inner">
         <NavLink to="/" className="nav__brand" end>
-          <span className="nav__mark" aria-hidden />
+          <img
+            className="nav__logo"
+            src={brand.logoSrc}
+            alt=""
+            width={32}
+            height={32}
+          />
           {brand.name}
         </NavLink>
 

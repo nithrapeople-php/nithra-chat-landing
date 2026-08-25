@@ -7,7 +7,16 @@ export function Home() {
     <section className="home">
       <div className="home__hero">
         <div className="home__copy">
-          <p className="home__brand">{brand.name}</p>
+          <p className="home__brand">
+            <img
+              className="home__logo"
+              src={brand.logoSrc}
+              alt=""
+              width={56}
+              height={56}
+            />
+            {brand.name}
+          </p>
           <h1>Your new home for collaboration.</h1>
           <p className="home__lede">
             One shared space for channels, calls, and follow-through — so teams

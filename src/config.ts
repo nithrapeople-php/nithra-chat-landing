@@ -3,9 +3,10 @@
  * Point FRAPPE_API_URL at your central Frappe control-plane site.
  */
 export const brand = {
-  name: 'Relay',
+  name: 'Nithra Chat',
   tagline: 'One shared space for cross-functional work',
-  domain: 'relay.app',
+  domain: 'nithra.chat',
+  logoSrc: '/nithra-logo.png',
 } as const
 
 /** Central Frappe site that handles signup + tenant provisioning */

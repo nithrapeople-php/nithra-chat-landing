@@ -1,4 +1,4 @@
-# Relay marketing site (Netlify)
+# Nithra Chat marketing site (Netlify)
 
 Vite + React landing for Frappe multi-tenant signup.
 
