@@ -42,6 +42,12 @@
   gap: 1.5rem;
 }
 
+@media (min-width: 640px) {
+  .footer__cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .footer__cols h4 {
   margin: 0 0 0.7rem;
   font-size: 0.78rem;
@@ -72,6 +78,15 @@
   color: var(--muted);
   font-size: 0.85rem;
   border-top: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.footer__legal a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.footer__legal a:hover {
+  color: var(--accent-2);
 }
 
 @media (min-width: 768px) {

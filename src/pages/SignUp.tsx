@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { TENANT_BASE_DOMAIN } from '../config'
 import { isApiConfigured, signupTenant } from '../lib/api'
 import './Form.css'
@@ -121,6 +121,12 @@ export function SignUp() {
         <button className="btn btn--primary" type="submit" disabled={loading}>
           {loading ? 'Creating…' : 'Create workspace'}
         </button>
+
+        <p className="form__footer-note">
+          By creating a workspace you agree to our{' '}
+          <Link to="/terms">Terms of Service</Link> and{' '}
+          <Link to="/privacy">Privacy Policy</Link>.
+        </p>
       </form>
     </section>
   )
