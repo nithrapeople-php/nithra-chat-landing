@@ -25,11 +25,17 @@ export function Footer() {
             <Link to="/signin">Sign in</Link>
             <Link to="/contact">Contact</Link>
           </div>
+          <div>
+            <h4>Legal</h4>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+          </div>
         </div>
       </div>
       <div className="footer__legal">
         <span>© {new Date().getFullYear()} {brand.name}</span>
-        <span>Team messenger & collaboration</span>
+        <Link to="/privacy">Privacy Policy</Link>
+        <Link to="/terms">Terms of Service</Link>
       </div>
     </footer>
   )

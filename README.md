@@ -13,6 +13,8 @@ Vite + React landing for Frappe multi-tenant signup.
 | `/signin` | Go to workspace |
 | `/provisioning` | Thank you / site status |
 | `/contact` | Contact |
+| `/privacy` | Privacy Policy |
+| `/terms` | Terms of Service |
 
 ## Local
 
