@@ -31,15 +31,23 @@ npm run dev
 3. Build: `npm run build`, publish: `dist` (also in `netlify.toml`).
 4. Set env vars: `VITE_FRAPPE_API_URL`, `VITE_TENANT_BASE_DOMAIN`.
 
-## Frappe API (central site)
+## Frappe API (central site — `nithra_saas` app)
 
-Expected whitelisted methods (adjust names in `src/lib/api.ts`):
+Whitelisted methods (Phase 3):
 
-- `saas.api.signup.create_tenant`
-- `saas.api.signup.get_status`
-- `saas.api.signup.resolve_workspace`
+- `nithra_saas.api.signup.create_tenant`
+- `nithra_saas.api.signup.get_status`
+- `nithra_saas.api.signup.resolve_workspace`
 
-Without `VITE_FRAPPE_API_URL`, signup runs in **demo mode** and still shows the provisioning screen.
+On the central site, set `allow_cors` in `site_config.json` to your landing origin(s), e.g.:
+
+```json
+{
+  "allow_cors": ["https://yoursite.netlify.app", "http://localhost:5173"]
+}
+```
+
+Without a real `VITE_FRAPPE_API_URL`, signup runs in **demo mode**.
 
 ## Rename the brand
 

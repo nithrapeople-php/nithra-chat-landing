@@ -1,10 +1,13 @@
 import { brand, FRAPPE_API_URL, TENANT_BASE_DOMAIN } from '../config'
 
+const SIGNUP_API = 'nithra_saas.api.signup'
+
 export type SignupPayload = {
   company: string
   subdomain: string
   adminEmail: string
   adminName: string
+  saas_plan?: string
 }
 
 export type SignupResult = {
@@ -20,20 +23,47 @@ export type ProvisioningStatus = {
   message?: string
 }
 
+function methodUrl(method: string, query?: Record<string, string>) {
+  const base = `${FRAPPE_API_URL}/api/method/${SIGNUP_API}.${method}`
+  if (!query) return base
+  const qs = new URLSearchParams(query).toString()
+  return `${base}?${qs}`
+}
+
+/** Parse Frappe error JSON into a short user-facing message. */
+async function errorFromResponse(res: Response): Promise<string> {
+  const text = await res.text()
+  try {
+    const data = JSON.parse(text)
+    if (typeof data.message === 'string' && data.message) return data.message
+    if (data.exception) {
+      const line = String(data.exception).split('\n')[0]
+      return line.replace(/^[^:]*:\s*/, '') || line
+    }
+    if (data._server_messages) {
+      const msgs = JSON.parse(data._server_messages)
+      const first = typeof msgs[0] === 'string' ? JSON.parse(msgs[0]) : msgs[0]
+      if (first?.message) return first.message
+    }
+  } catch {
+    /* use raw text */
+  }
+  return text.slice(0, 280) || `Request failed (${res.status})`
+}
+
 /**
- * Calls your central Frappe site to create a tenant + provision a site.
- * Wire this to a whitelisted method, e.g. saas.api.signup.create_tenant
+ * Calls central site to create a tenant + provision a site.
+ * Method: nithra_saas.api.signup.create_tenant
  */
 export async function signupTenant(payload: SignupPayload): Promise<SignupResult> {
-  const res = await fetch(`${FRAPPE_API_URL}/api/method/saas.api.signup.create_tenant`, {
+  const res = await fetch(methodUrl('create_tenant'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || `Signup failed (${res.status})`)
+    throw new Error(await errorFromResponse(res))
   }
 
   const data = await res.json()
@@ -46,14 +76,14 @@ export async function signupTenant(payload: SignupPayload): Promise<SignupResult
   }
 }
 
-/** Poll provisioning status by job id (or subdomain). */
+/** Poll provisioning status by public job_id. */
 export async function getProvisioningStatus(jobId: string): Promise<ProvisioningStatus> {
-  const res = await fetch(
-    `${FRAPPE_API_URL}/api/method/saas.api.signup.get_status?job_id=${encodeURIComponent(jobId)}`,
-  )
+  const res = await fetch(methodUrl('get_status', { job_id: jobId }), {
+    headers: { Accept: 'application/json' },
+  })
 
   if (!res.ok) {
-    throw new Error(`Status check failed (${res.status})`)
+    throw new Error(await errorFromResponse(res))
   }
 
   const data = await res.json()
@@ -67,9 +97,9 @@ export async function getProvisioningStatus(jobId: string): Promise<Provisioning
 
 /** Resolve where an existing customer should go (email → tenant site). */
 export async function resolveWorkspace(email: string): Promise<{ siteUrl: string } | null> {
-  const res = await fetch(
-    `${FRAPPE_API_URL}/api/method/saas.api.signup.resolve_workspace?email=${encodeURIComponent(email)}`,
-  )
+  const res = await fetch(methodUrl('resolve_workspace', { email }), {
+    headers: { Accept: 'application/json' },
+  })
 
   if (!res.ok) return null
 
