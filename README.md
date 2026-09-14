@@ -19,10 +19,26 @@ Vite + React landing for Frappe multi-tenant signup.
 ## Local
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
+# .env.local is gitignored — use raven.local for local Frappe
 npm install
 npm run dev
 ```
+
+Open http://localhost:5173 — signup hits `http://raven.local:8000/api/method/nithra_saas.api.signup.*`.
+
+## Env: local vs server (yes, manage separately)
+
+Same variable **names**, different **values**:
+
+| Variable | Local | Production (Netlify) |
+|----------|--------|----------------------|
+| `VITE_FRAPPE_API_URL` | `http://raven.local:8000` | `https://saas.nithrateams.com` (your central site) |
+| `VITE_TENANT_BASE_DOMAIN` | `nithrateams.com` | `nithrateams.com` |
+
+- **Local:** `.env.local` (not committed)
+- **Server:** Netlify → Site settings → Environment variables → set both, then redeploy  
+- Vite bakes these in at **build** time — changing Netlify env requires a new deploy
 
 ## Netlify
 
