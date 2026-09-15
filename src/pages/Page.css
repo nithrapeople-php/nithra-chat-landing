@@ -8,6 +8,10 @@
   max-width: 40rem;
 }
 
+.page--wide {
+  max-width: 56rem;
+}
+
 .page__intro {
   margin-bottom: 2rem;
 }
