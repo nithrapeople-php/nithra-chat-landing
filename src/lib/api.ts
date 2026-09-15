@@ -8,6 +8,8 @@ export type SignupPayload = {
   adminEmail: string
   adminName: string
   saas_plan?: string
+  /** Frappe app names selected on the trial picker */
+  apps?: string[]
 }
 
 export type SignupResult = {
