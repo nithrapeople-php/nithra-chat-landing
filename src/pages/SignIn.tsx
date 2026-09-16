@@ -1,10 +1,55 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { brand, TENANT_BASE_DOMAIN } from '../config'
-import { defaultMockSession, saveMockSession } from '../data/portalMock'
+import {
+  defaultMockSession,
+  saveMockSession,
+  type PortalPlanId,
+  type PortalRole,
+} from '../data/portalMock'
 import './Form.css'
 import './Page.css'
 import './SignIn.css'
+
+type DemoPersona = {
+  id: string
+  label: string
+  email: string
+  role: PortalRole
+  planId: PortalPlanId
+  appIds: string[]
+  blurb: string
+}
+
+const PERSONAS: DemoPersona[] = [
+  {
+    id: 'owner',
+    label: 'Ada · Owner',
+    email: 'ada@acme.com',
+    role: 'owner',
+    planId: 'suite',
+    appIds: ['raven', 'crm'],
+    blurb: 'Chat + CRM, can manage users',
+  },
+  {
+    id: 'member',
+    label: 'Sam · Member',
+    email: 'sam@acme.com',
+    role: 'member',
+    planId: 'suite',
+    appIds: ['raven'],
+    blurb: 'Chat only, no user admin',
+  },
+  {
+    id: 'chat-plan',
+    label: 'Ada · Chat plan',
+    email: 'ada@acme.com',
+    role: 'owner',
+    planId: 'chat',
+    appIds: ['raven'],
+    blurb: 'Only Chat on the plan',
+  },
+]
 
 /** Design mock — no API. Continue → /home */
 export function SignIn() {
@@ -17,8 +62,23 @@ export function SignIn() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function enterPortal(nextEmail?: string) {
-    saveMockSession(defaultMockSession(nextEmail))
+  function enterAs(persona?: DemoPersona, nextEmail?: string) {
+    if (persona) {
+      saveMockSession(
+        defaultMockSession(persona.email, {
+          role: persona.role,
+          planId: persona.planId,
+          appIds: persona.appIds,
+          subdomain: subdomain.trim() || 'acme',
+        }),
+      )
+    } else {
+      saveMockSession(
+        defaultMockSession(nextEmail || 'ada@acme.com', {
+          subdomain: subdomain.trim() || 'acme',
+        }),
+      )
+    }
     navigate('/home')
   }
 
@@ -28,26 +88,15 @@ export function SignIn() {
     setLoading(true)
 
     window.setTimeout(() => {
-      if (advancedOpen && subdomain.trim()) {
-        const session = defaultMockSession(email || undefined)
-        session.subdomain = subdomain.trim().toLowerCase()
-        saveMockSession(session)
-        setLoading(false)
-        navigate('/home')
-        return
-      }
-
       const trimmed = email.trim()
-      // Design: empty email → demo user so Continue always works for click-through
       if (trimmed && !trimmed.includes('@')) {
         setLoading(false)
-        setError('Enter a valid work email, or leave blank to preview as ada@acme.com.')
+        setError('Enter a valid work email, pick a demo persona, or leave blank for Ada.')
         return
       }
-
       setLoading(false)
-      enterPortal(trimmed || 'ada@acme.com')
-    }, 350)
+      enterAs(undefined, trimmed || 'ada@acme.com')
+    }, 280)
   }
 
   return (
@@ -61,6 +110,24 @@ export function SignIn() {
           </p>
         </div>
 
+        <div className="signin__demos" aria-label="Demo personas">
+          <p className="signin__demos-label">Quick demo</p>
+          <div className="signin__demo-row">
+            {PERSONAS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="signin__demo"
+                onClick={() => enterAs(p)}
+                title={p.blurb}
+              >
+                <span className="signin__demo-title">{p.label}</span>
+                <span className="signin__demo-blurb">{p.blurb}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <form className="form signin__form" onSubmit={onSubmit} noValidate>
           <label>
             Work email
@@ -70,7 +137,6 @@ export function SignIn() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
               autoComplete="username"
-              autoFocus
             />
           </label>
 
@@ -95,7 +161,7 @@ export function SignIn() {
             </div>
           </label>
           <p className="form__hint signin__hint">
-            Design mock — Continue opens the portal home preview. No server calls.
+            Design mock — no server. Continue or use a demo persona above.
           </p>
 
           {error && (
@@ -121,9 +187,7 @@ export function SignIn() {
 
           {advancedOpen && (
             <div className="signin__advanced-body">
-              <p className="form__hint">
-                Optional mock subdomain for the org (still opens portal home only).
-              </p>
+              <p className="form__hint">Optional mock subdomain stored on the preview session.</p>
               <label>
                 Workspace subdomain
                 <div className="form__subdomain">

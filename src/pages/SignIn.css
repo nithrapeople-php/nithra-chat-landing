@@ -68,6 +68,54 @@
   margin-top: -0.25rem;
 }
 
+.signin__demos {
+  margin-bottom: 1.15rem;
+}
+
+.signin__demos-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.signin__demo-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.signin__demo {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 3%, #fff);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.signin__demo:hover {
+  border-color: color-mix(in srgb, var(--accent-2) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+}
+
+.signin__demo-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.signin__demo-blurb {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .signin__preview {
   padding: 0.75rem 0.85rem;
   border-radius: 0.65rem;

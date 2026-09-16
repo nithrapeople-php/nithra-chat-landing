@@ -1,8 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { PortalLayout } from './components/PortalLayout'
 import { Contact } from './pages/Contact'
 import { Features } from './pages/Features'
 import { Home } from './pages/Home'
+import { PortalBilling } from './pages/PortalBilling'
 import { PortalHome } from './pages/PortalHome'
 import { PortalUsers } from './pages/PortalUsers'
 import { Pricing } from './pages/Pricing'
@@ -22,14 +24,19 @@ export default function App() {
           <Route path="pricing" element={<Pricing />} />
           <Route path="signup" element={<SignUp />} />
           <Route path="signin" element={<SignIn />} />
-          <Route path="home" element={<PortalHome />} />
-          <Route path="users" element={<PortalUsers />} />
           <Route path="provisioning" element={<Provisioning />} />
           <Route path="contact" element={<Contact />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="terms" element={<Terms />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
+
+        <Route element={<PortalLayout />}>
+          <Route path="home" element={<PortalHome />} />
+          <Route path="users" element={<PortalUsers />} />
+          <Route path="billing" element={<PortalBilling />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

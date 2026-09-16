@@ -1,0 +1,276 @@
+.billing__current {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.billing__current-main,
+.billing__usage {
+  padding: 1.25rem 1.15rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, #fff);
+}
+
+.billing__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.billing__plan-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  letter-spacing: -0.04em;
+}
+
+.billing__price {
+  margin: 0.55rem 0 0;
+  color: var(--ink);
+}
+
+.billing__price strong {
+  font-size: 1.35rem;
+}
+
+.billing__price span,
+.billing__renew {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.billing__renew {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
+.billing__usage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.92rem;
+  margin-bottom: 0.55rem;
+}
+
+.billing__usage-head span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.billing__bar {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.billing__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.billing__meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.billing__meta li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.billing__meta span {
+  color: var(--muted);
+}
+
+.billing__meta strong {
+  font-weight: 650;
+  text-align: right;
+}
+
+.billing__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.billing-plan {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  padding: 1.2rem 1.1rem 1.15rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: #fff;
+}
+
+.billing-plan--active {
+  border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.billing-plan__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.billing-plan__head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.billing-plan__badge {
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent) 16%, #fff);
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+}
+
+.billing-plan__price {
+  margin: 0;
+}
+
+.billing-plan__price strong {
+  font-size: 1.4rem;
+}
+
+.billing-plan__price span,
+.billing-plan__seats {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.billing-plan__seats {
+  margin: 0;
+}
+
+.billing-plan__features {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0 0 0 1.1rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.billing-plan .btn {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.billing__invoices {
+  overflow-x: auto;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: #fff;
+}
+
+.billing__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.billing__table th,
+.billing__table td {
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.billing__table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.billing__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.billing__status {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.billing__status--paid {
+  background: color-mix(in srgb, #12b76a 16%, #fff);
+  color: #027a48;
+}
+
+.billing__status--open {
+  background: color-mix(in srgb, var(--accent) 18%, #fff);
+  color: var(--accent-2);
+}
+
+.billing__status--failed {
+  background: color-mix(in srgb, #b42318 12%, #fff);
+  color: #b42318;
+}
+
+@media (max-width: 800px) {
+  .billing__current {
+    grid-template-columns: 1fr;
+  }
+
+  .billing__table thead {
+    display: none;
+  }
+
+  .billing__table tr {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.85rem 0.9rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+
+  .billing__table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+  }
+
+  .billing__table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 650;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .billing__table td:not([data-label])::before,
+  .billing__table td[data-label='']::before {
+    content: none;
+  }
+}

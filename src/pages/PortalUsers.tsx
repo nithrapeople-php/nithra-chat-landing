@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
 import {
-  MOCK_APPS,
+  ALL_APPS,
   MOCK_SEATS,
   MOCK_USERS,
   readMockSession,
@@ -14,13 +13,13 @@ import './PortalHome.css'
 import './PortalUsers.css'
 
 export function PortalUsers() {
-  const session = readMockSession()
+  const session = readMockSession()!
+  const canManage = session.role === 'owner' || session.role === 'admin'
   const [users, setUsers] = useState<PortalUser[]>(() => [...MOCK_USERS])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<PortalRole>('member')
-
-  const canManage = session && (session.role === 'owner' || session.role === 'admin')
+  const [formError, setFormError] = useState('')
 
   const seats = useMemo(
     () => ({
@@ -30,18 +29,32 @@ export function PortalUsers() {
     [users],
   )
 
-  if (!session) {
-    return <Navigate to="/signin" replace />
-  }
-
   if (!canManage) {
-    return <Navigate to="/home" replace />
+    return (
+      <section className="page page--wide portal">
+        <div className="portal__empty">
+          <p>You don’t have permission to manage users.</p>
+          <p className="portal__empty-hint">Ask an owner or admin, or use the Ada demo persona.</p>
+        </div>
+      </section>
+    )
   }
 
   function addUser(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim() || !email.trim() || !email.includes('@')) return
-    if (seats.used >= seats.limit) return
+    setFormError('')
+    if (!name.trim() || !email.trim() || !email.includes('@')) {
+      setFormError('Name and a valid email are required.')
+      return
+    }
+    if (seats.used >= seats.limit) {
+      setFormError(`Seat limit reached (${seats.limit}). Upgrade the plan to invite more.`)
+      return
+    }
+    if (users.some((u) => u.email === email.trim().toLowerCase())) {
+      setFormError('That email is already on the workspace.')
+      return
+    }
 
     setUsers((prev) => [
       {
@@ -63,6 +76,8 @@ export function PortalUsers() {
     setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)))
   }
 
+  const atLimit = seats.used >= seats.limit
+
   return (
     <section className="page page--wide portal">
       <header className="portal__top">
@@ -70,12 +85,13 @@ export function PortalUsers() {
           <p className="eyebrow">Admin</p>
           <h1>Users</h1>
           <p className="lede portal__lede">
-            {seats.used} / {seats.limit} seats · design mock (local state only)
+            <span className={atLimit ? 'portal-users__seats--full' : ''}>
+              {seats.used} / {seats.limit} seats
+            </span>
+            {' · '}
+            design mock (local state only)
           </p>
         </div>
-        <Link to="/home" className="btn btn--ghost">
-          Back to apps
-        </Link>
       </header>
 
       <form className="form portal-users__invite" onSubmit={addUser}>
@@ -102,56 +118,79 @@ export function PortalUsers() {
               <option value="owner">Owner</option>
             </select>
           </label>
-          <button className="btn btn--primary" type="submit">
+          <button className="btn btn--primary" type="submit" disabled={atLimit}>
             Add
           </button>
         </div>
+        {formError && (
+          <p className="form__error" role="alert">
+            {formError}
+          </p>
+        )}
+        {atLimit && !formError && (
+          <p className="form__hint">Seat limit reached — disable someone or upgrade (mock).</p>
+        )}
       </form>
 
-      <div className="portal-users__table-wrap">
-        <table className="portal-users__table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Apps</th>
-              <th>Status</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name}</td>
-                <td>{u.email}</td>
-                <td>{u.role}</td>
-                <td>
-                  {u.apps
-                    .map((id) => MOCK_APPS.find((a) => a.id === id)?.label || id)
-                    .join(', ')}
-                </td>
-                <td>
-                  <span className={`portal-users__status portal-users__status--${u.status}`}>
-                    {u.status}
-                  </span>
-                </td>
-                <td className="portal-users__row-actions">
-                  {u.status !== 'disabled' ? (
-                    <button type="button" className="linkish" onClick={() => setStatus(u.id, 'disabled')}>
-                      Disable
-                    </button>
-                  ) : (
-                    <button type="button" className="linkish" onClick={() => setStatus(u.id, 'active')}>
-                      Enable
-                    </button>
-                  )}
-                </td>
+      {users.length === 0 ? (
+        <div className="portal__empty">
+          <p>No users yet.</p>
+          <p className="portal__empty-hint">Invite your first teammate above.</p>
+        </div>
+      ) : (
+        <div className="portal-users__table-wrap">
+          <table className="portal-users__table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Apps</th>
+                <th>Status</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td data-label="Name">{u.name}</td>
+                  <td data-label="Email">{u.email}</td>
+                  <td data-label="Role">{u.role}</td>
+                  <td data-label="Apps">
+                    {u.apps
+                      .map((id) => ALL_APPS.find((a) => a.id === id)?.label || id)
+                      .join(', ')}
+                  </td>
+                  <td data-label="Status">
+                    <span className={`portal-users__status portal-users__status--${u.status}`}>
+                      {u.status}
+                    </span>
+                  </td>
+                  <td className="portal-users__row-actions" data-label="">
+                    {u.status !== 'disabled' ? (
+                      <button
+                        type="button"
+                        className="linkish"
+                        onClick={() => setStatus(u.id, 'disabled')}
+                      >
+                        Disable
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="linkish"
+                        onClick={() => setStatus(u.id, 'active')}
+                      >
+                        Enable
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }

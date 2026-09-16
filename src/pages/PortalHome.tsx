@@ -1,36 +1,18 @@
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { brand, TENANT_BASE_DOMAIN } from '../config'
-import {
-  MOCK_APPS,
-  clearMockSession,
-  readMockSession,
-  type PortalApp,
-} from '../data/portalMock'
+import { TENANT_BASE_DOMAIN } from '../config'
+import { brand } from '../config'
+import { appsForSession, readMockSession } from '../data/portalMock'
 import './Page.css'
 import './PortalHome.css'
 
 export function PortalHome() {
-  const navigate = useNavigate()
-  const session = readMockSession()
+  const session = readMockSession()!
+  const apps = appsForSession(session)
+  const openable = apps.filter((a) => a.entitled)
+  const locked = apps.filter((a) => !a.entitled)
 
-  if (!session) {
-    return <Navigate to="/signin" replace />
-  }
-
-  const canManageUsers = session.role === 'owner' || session.role === 'admin'
-
-  function openApp(app: PortalApp) {
-    if (!app.entitled) return
-    // Design mock — real handoff later
-    const url = `https://${session!.subdomain}.${TENANT_BASE_DOMAIN}${app.path}`
-    window.alert(
-      `Design preview\n\nWould open:\n${url}\n\n(Not wired — no redirect yet.)`,
-    )
-  }
-
-  function signOut() {
-    clearMockSession()
-    navigate('/signin')
+  function openApp(path: string, label: string) {
+    const url = `https://${session.subdomain}.${TENANT_BASE_DOMAIN}${path}`
+    window.alert(`Design preview\n\n${label}\n${url}\n\n(Not wired yet.)`)
   }
 
   return (
@@ -40,44 +22,61 @@ export function PortalHome() {
           <p className="eyebrow">Your workspace</p>
           <h1>{session.orgName}</h1>
           <p className="lede portal__lede">
-            Signed in as {session.name} ({session.email}) · {session.role}
+            {session.planId === 'chat' ? 'Chat plan' : 'Suite plan'} · pick an app to continue
           </p>
-        </div>
-        <div className="portal__actions">
-          {canManageUsers && (
-            <Link to="/users" className="btn btn--ghost">
-              Manage users
-            </Link>
-          )}
-          <button type="button" className="btn btn--ghost" onClick={signOut}>
-            Sign out
-          </button>
         </div>
       </header>
 
-      <p className="portal__banner">Design mock — no API. App clicks show a preview only.</p>
+      <p className="portal__banner">
+        Design mock — no API. Use the left menu for Apps, Manage users, and Sign out.
+      </p>
 
       <h2 className="portal__section-title">Your apps</h2>
-      <div className="portal__grid">
-        {MOCK_APPS.map((app) => (
-          <button
-            key={app.id}
-            type="button"
-            className={`portal-app${app.entitled ? '' : ' portal-app--locked'}`}
-            onClick={() => openApp(app)}
-            disabled={!app.entitled}
-          >
-            <span className="portal-app__label">{app.label}</span>
-            <span className="portal-app__desc">{app.description}</span>
-            <span className="portal-app__meta">
-              {app.entitled ? `Open ${app.path}` : 'Not on your plan'}
-            </span>
-          </button>
-        ))}
-      </div>
+
+      {openable.length === 0 ? (
+        <div className="portal__empty">
+          <p>No apps assigned to your account yet.</p>
+          <p className="portal__empty-hint">Ask an admin to grant access, or sign in as Ada (owner).</p>
+        </div>
+      ) : (
+        <div className="portal__grid">
+          {openable.map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              className="portal-app"
+              onClick={() => openApp(app.path, app.label)}
+            >
+              <span className="portal-app__label">{app.label}</span>
+              <span className="portal-app__desc">{app.description}</span>
+              <span className="portal-app__meta">Open {app.path}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {locked.length > 0 && (
+        <>
+          <h2 className="portal__section-title portal__section-title--spaced">Unavailable</h2>
+          <p className="portal__unavailable-lede">
+            More Frappe apps you can add by upgrading your plan (design list).
+          </p>
+          <div className="portal__grid">
+            {locked.map((app) => (
+              <div key={app.id} className="portal-app portal-app--locked" aria-disabled>
+                <span className="portal-app__label">{app.label}</span>
+                <span className="portal-app__desc">{app.description}</span>
+                <span className="portal-app__meta">
+                  {app.onPlan ? 'Not assigned to you' : 'Not on your plan · Upgrade to unlock'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <p className="portal__footnote">
-        {brand.name} portal design · tenant apps open on your site later via SSO
+        {brand.name} portal design · SSO handoff to tenant apps comes later
       </p>
     </section>
   )
