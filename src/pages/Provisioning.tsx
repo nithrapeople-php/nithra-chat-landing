@@ -1,18 +1,102 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
   getProvisioningStatus,
   isApiConfigured,
+  signupTenant,
   tenantUrlFromSubdomain,
   type ProvisioningStatus,
+  type SignupPayload,
 } from '../lib/api'
 import './Page.css'
 import './Provisioning.css'
 
+const SIGNUP_STORAGE_PREFIX = 'nithra-signup:'
+const JOB_STORAGE_PREFIX = 'nithra-job:'
+
+/** Dedupe create_tenant across React Strict Mode remounts. */
+const createInFlight = new Map<string, Promise<string>>()
+
+type LocationState = { signup?: SignupPayload }
+
+function readStoredSignup(subdomain: string): SignupPayload | null {
+  try {
+    const raw = sessionStorage.getItem(`${SIGNUP_STORAGE_PREFIX}${subdomain}`)
+    if (!raw) return null
+    return JSON.parse(raw) as SignupPayload
+  } catch {
+    return null
+  }
+}
+
+function readStoredJob(subdomain: string): string | null {
+  try {
+    return sessionStorage.getItem(`${JOB_STORAGE_PREFIX}${subdomain}`)
+  } catch {
+    return null
+  }
+}
+
+function storeJob(subdomain: string, jobId: string) {
+  try {
+    sessionStorage.setItem(`${JOB_STORAGE_PREFIX}${subdomain}`, jobId)
+    sessionStorage.removeItem(`${SIGNUP_STORAGE_PREFIX}${subdomain}`)
+  } catch {
+    /* ignore */
+  }
+}
+
+function plainText(message: string): string {
+  let m = message.trim()
+  try {
+    if (m.startsWith('[')) {
+      const arr = JSON.parse(m)
+      const first = typeof arr[0] === 'string' ? JSON.parse(arr[0]) : arr[0]
+      if (first?.message) m = String(first.message)
+    }
+  } catch {
+    /* keep original */
+  }
+  const stripped = m.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return stripped || message
+}
+
+async function ensureJobId(
+  subdomain: string,
+  signup: SignupPayload | null | undefined,
+): Promise<string> {
+  const existing = readStoredJob(subdomain)
+  if (existing) return existing
+
+  let pending = createInFlight.get(subdomain)
+  if (!pending) {
+    const payload = signup ?? readStoredSignup(subdomain)
+    if (!payload) {
+      throw new Error('Missing signup details. Go back and start again.')
+    }
+    pending = signupTenant(payload).then((result) => {
+      const job = result.jobId
+      if (!job) throw new Error('No job id returned from signup.')
+      storeJob(subdomain, job)
+      return job
+    })
+    createInFlight.set(subdomain, pending)
+  }
+
+  try {
+    return await pending
+  } finally {
+    // Keep resolved promise briefly so remounts reuse the same job id
+    window.setTimeout(() => createInFlight.delete(subdomain), 30_000)
+  }
+}
+
 export function Provisioning() {
-  const [params] = useSearchParams()
-  const jobId = params.get('job') || ''
+  const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  const jobFromUrl = params.get('job') || ''
   const subdomain = params.get('subdomain') || ''
+  const signupFromNav = (location.state as LocationState | null)?.signup
 
   const demoUrl = useMemo(
     () => (subdomain ? tenantUrlFromSubdomain(subdomain) : undefined),
@@ -23,7 +107,7 @@ export function Provisioning() {
     status: isApiConfigured() ? 'pending' : 'creating',
     siteUrl: isApiConfigured() ? undefined : demoUrl,
     message: isApiConfigured()
-      ? 'Queued site creation…'
+      ? 'Queuing your workspace…'
       : 'Demo mode — your control-plane API is not connected yet.',
   })
 
@@ -39,21 +123,24 @@ export function Provisioning() {
       return () => window.clearTimeout(t)
     }
 
-    if (!jobId) {
-      setStatus({ status: 'failed', message: 'Missing job id.' })
+    if (!subdomain && !jobFromUrl) {
+      setStatus({ status: 'failed', message: 'Missing workspace details.' })
       return
     }
 
     let cancelled = false
     let timer: number | undefined
 
-    async function tick() {
+    async function tick(jobId: string) {
       try {
         const next = await getProvisioningStatus(jobId)
         if (cancelled) return
-        setStatus(next)
+        setStatus({
+          ...next,
+          message: next.message ? plainText(next.message) : next.message,
+        })
         if (next.status !== 'ready' && next.status !== 'failed') {
-          timer = window.setTimeout(tick, 2500)
+          timer = window.setTimeout(() => tick(jobId), 2500)
         }
       } catch {
         if (!cancelled) {
@@ -62,12 +149,38 @@ export function Provisioning() {
       }
     }
 
-    tick()
+    async function start() {
+      try {
+        let jobId = jobFromUrl || (subdomain ? readStoredJob(subdomain) : null) || ''
+        if (!jobId) {
+          setStatus({ status: 'pending', message: 'Queuing your workspace…' })
+          jobId = await ensureJobId(subdomain, signupFromNav)
+          if (cancelled) return
+          setParams(
+            { job: jobId, subdomain },
+            { replace: true },
+          )
+        } else if (!jobFromUrl && subdomain) {
+          setParams({ job: jobId, subdomain }, { replace: true })
+        }
+
+        if (cancelled) return
+        setStatus({ status: 'pending', message: 'Queued site creation…' })
+        await tick(jobId)
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Signup failed.'
+          setStatus({ status: 'failed', message: plainText(msg) })
+        }
+      }
+    }
+
+    start()
     return () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [jobId, demoUrl])
+  }, [jobFromUrl, subdomain, demoUrl, signupFromNav, setParams])
 
   const label =
     status.status === 'ready'

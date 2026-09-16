@@ -7,12 +7,14 @@ import {
   catalogByCategory,
   defaultSelectedAppIds,
 } from '../data/appCatalog'
-import { isApiConfigured, signupTenant } from '../lib/api'
+import { isApiConfigured, type SignupPayload } from '../lib/api'
 import './Form.css'
 import './Page.css'
 import './SignUp.css'
 
 type Step = 'apps' | 'details'
+
+const SIGNUP_STORAGE_PREFIX = 'nithra-signup:'
 
 export function SignUp() {
   const navigate = useNavigate()
@@ -23,7 +25,6 @@ export function SignUp() {
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
   const groups = useMemo(() => catalogByCategory(), [])
   const selectedApps = useMemo(
@@ -47,39 +48,41 @@ export function SignUp() {
     setStep('details')
   }
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
-    const apps = appNamesFromIds(selectedIds)
-    const payload = {
+    const payload: SignupPayload = {
       company: company.trim(),
       subdomain: subdomain.trim().toLowerCase(),
       adminName: adminName.trim(),
       adminEmail: adminEmail.trim().toLowerCase(),
-      apps,
+      apps: appNamesFromIds(selectedIds),
     }
 
-    try {
-      if (!isApiConfigured()) {
-        const fakeJob = `local-${payload.subdomain}-${Date.now()}`
-        navigate(
-          `/provisioning?job=${encodeURIComponent(fakeJob)}&subdomain=${encodeURIComponent(payload.subdomain)}`,
-        )
-        return
-      }
+    if (!payload.company || !payload.subdomain || !payload.adminName || !payload.adminEmail) {
+      setError('Please fill in all fields.')
+      return
+    }
 
-      const result = await signupTenant(payload)
-      const job = result.jobId || payload.subdomain
+    if (!isApiConfigured()) {
+      const fakeJob = `local-${payload.subdomain}-${Date.now()}`
       navigate(
-        `/provisioning?job=${encodeURIComponent(job)}&subdomain=${encodeURIComponent(payload.subdomain)}`,
+        `/provisioning?job=${encodeURIComponent(fakeJob)}&subdomain=${encodeURIComponent(payload.subdomain)}`,
       )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Signup failed. Try again.')
-    } finally {
-      setLoading(false)
+      return
     }
+
+    // Redirect immediately; Provisioning page creates the tenant + polls.
+    try {
+      sessionStorage.setItem(`${SIGNUP_STORAGE_PREFIX}${payload.subdomain}`, JSON.stringify(payload))
+    } catch {
+      /* private mode — location.state still works for this navigation */
+    }
+
+    navigate(`/provisioning?subdomain=${encodeURIComponent(payload.subdomain)}`, {
+      state: { signup: payload },
+    })
   }
 
   if (step === 'apps') {
@@ -218,8 +221,8 @@ export function SignUp() {
 
         {error && <p className="form__error">{error}</p>}
 
-        <button className="btn btn--primary" type="submit" disabled={loading}>
-          {loading ? 'Creating…' : 'Start now'}
+        <button className="btn btn--primary" type="submit">
+          Start now
         </button>
 
         <p className="form__footer-note">
