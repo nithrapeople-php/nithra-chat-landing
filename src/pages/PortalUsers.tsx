@@ -44,6 +44,8 @@ export function PortalUsers() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<PortalRole>('member')
+  const [password, setPassword] = useState('')
+  const [sendWelcomeEmail, setSendWelcomeEmail] = useState(false)
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
   const [inviteLink, setInviteLink] = useState('')
@@ -107,6 +109,10 @@ export function PortalUsers() {
       setFormError('Name and a valid email are required.')
       return
     }
+    if (password && password.length < 8) {
+      setFormError('Password must be at least 8 characters (or leave blank for accept-invite link).')
+      return
+    }
     if (seats.used >= seats.limit) {
       setFormError(`Seat limit reached (${seats.limit}).`)
       return
@@ -124,7 +130,7 @@ export function PortalUsers() {
           email: email.trim().toLowerCase(),
           role: role === 'owner' ? 'admin' : role,
           apps: ['raven'],
-          status: 'invited',
+          status: password ? 'active' : 'invited',
           synced: false,
         },
         ...prev,
@@ -132,7 +138,13 @@ export function PortalUsers() {
       setName('')
       setEmail('')
       setRole('member')
-      setFormSuccess('Invite added (demo — not synced to Frappe).')
+      setPassword('')
+      setSendWelcomeEmail(false)
+      setFormSuccess(
+        password
+          ? 'User added with password (demo — not synced to Frappe).'
+          : 'Invite added (demo — not synced to Frappe).',
+      )
       return
     }
 
@@ -144,22 +156,32 @@ export function PortalUsers() {
         full_name: name.trim(),
         role: role === 'owner' ? 'Admin' : role,
         apps: session.appIds,
+        password: password || undefined,
+        send_welcome_email: sendWelcomeEmail,
       })
       if (result.invite_token) {
         const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(result.invite_token)}`
         setInviteLink(link)
       }
-      if (result.synced) {
-        setFormSuccess('User invited and synced to the workspace (Frappe). Share the accept link so they can set a password.')
-      } else if (result.sync_error) {
-        setFormSuccess(`Invite created, but sync failed: ${result.sync_error}`)
+      if (result.sync_error) {
+        setFormSuccess(`Saved, but sync failed: ${result.sync_error}`)
+      } else if (result.message) {
+        setFormSuccess(result.message)
+      } else if (result.synced) {
+        setFormSuccess(
+          result.activated
+            ? 'User added with password and synced to the workspace.'
+            : 'User invited and synced. Share the accept link so they can set a password.',
+        )
       } else {
-        setFormSuccess(result.message || 'Invite created.')
+        setFormSuccess('Invite created.')
       }
       await refreshUsers()
       setName('')
       setEmail('')
       setRole('member')
+      setPassword('')
+      setSendWelcomeEmail(false)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Invite failed')
     } finally {
@@ -260,6 +282,33 @@ export function PortalUsers() {
             {loading ? 'Inviting…' : 'Invite'}
           </button>
         </div>
+        <div className="portal-users__invite-extra">
+          <label>
+            Password <span className="form__optional">(optional — synced to workspace)</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min 8 characters"
+              minLength={8}
+            />
+          </label>
+          <label className="portal-users__check">
+            <input
+              type="checkbox"
+              checked={sendWelcomeEmail}
+              onChange={(e) => setSendWelcomeEmail(e.target.checked)}
+            />
+            <span>
+              Welcome email <span className="form__optional">(saved for later — not sent yet)</span>
+            </span>
+          </label>
+        </div>
+        <p className="form__hint portal-users__invite-hint">
+          Set a password to activate the user now and sync it to Frappe. Leave blank to send an
+          accept-invite link instead.
+        </p>
         {formError && (
           <p className="form__error" role="alert">
             {formError}
