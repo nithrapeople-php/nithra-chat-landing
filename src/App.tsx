@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { PortalLayout } from './components/PortalLayout'
+import { AcceptInvite } from './pages/AcceptInvite'
 import { Contact } from './pages/Contact'
 import { Features } from './pages/Features'
 import { Home } from './pages/Home'
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="pricing" element={<Pricing />} />
           <Route path="signup" element={<SignUp />} />
           <Route path="signin" element={<SignIn />} />
+          <Route path="accept-invite" element={<AcceptInvite />} />
           <Route path="provisioning" element={<Provisioning />} />
           <Route path="contact" element={<Contact />} />
           <Route path="privacy" element={<Privacy />} />

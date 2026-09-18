@@ -252,6 +252,36 @@ export async function inviteOrgUser(payload: {
   return data.message ?? data
 }
 
+export async function setOrgUserStatus(payload: {
+  tenant: string
+  membership_id: string
+  status: 'Active' | 'Disabled' | 'active' | 'disabled'
+}) {
+  const res = await fetch(authMethodUrl('set_org_user_status'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    throw new Error(await errorFromResponse(res))
+  }
+  const data = await res.json()
+  return data.message ?? data
+}
+
+export async function syncOrgUser(payload: { tenant: string; membership_id: string }) {
+  const res = await fetch(authMethodUrl('sync_org_user'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    throw new Error(await errorFromResponse(res))
+  }
+  const data = await res.json()
+  return data.message ?? data
+}
+
 /** Resolve where an existing customer should go (email → tenant site). */
 export async function resolveWorkspace(email: string): Promise<{ siteUrl: string; chatUrl?: string } | null> {
   const res = await fetch(signupMethodUrl('resolve_workspace', { email }), {

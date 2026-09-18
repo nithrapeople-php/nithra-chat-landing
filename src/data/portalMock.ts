@@ -16,6 +16,7 @@ export type PortalUser = {
   role: PortalRole
   apps: string[]
   status: 'active' | 'invited' | 'disabled'
+  synced?: boolean
 }
 
 export type PortalPlanId = 'chat' | 'suite'

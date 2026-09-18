@@ -1,11 +1,41 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ALL_APPS, MOCK_SEATS, MOCK_USERS, type PortalRole, type PortalUser } from '../data/portalMock'
-import { inviteOrgUser, isApiConfigured, listOrgUsers } from '../lib/api'
+import {
+  inviteOrgUser,
+  isApiConfigured,
+  listOrgUsers,
+  setOrgUserStatus,
+  syncOrgUser,
+} from '../lib/api'
 import { readUnifiedSession } from '../lib/portalSession'
 import './Form.css'
 import './Page.css'
 import './PortalHome.css'
 import './PortalUsers.css'
+
+type StatusFilter = 'all' | 'active' | 'invited' | 'disabled'
+
+type ApiUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  apps: string[]
+  status: string
+  synced?: boolean
+}
+
+function mapApiUsers(rows: ApiUser[]): PortalUser[] {
+  return (rows || []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role as PortalRole,
+    apps: u.apps || ['raven'],
+    status: u.status as PortalUser['status'],
+    synced: Boolean(u.synced),
+  }))
+}
 
 export function PortalUsers() {
   const session = readUnifiedSession()!
@@ -15,8 +45,12 @@ export function PortalUsers() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<PortalRole>('member')
   const [formError, setFormError] = useState('')
-  const [inviteToken, setInviteToken] = useState('')
+  const [formSuccess, setFormSuccess] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
   const [loading, setLoading] = useState(false)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [listError, setListError] = useState('')
 
   const seats = useMemo(
     () => ({
@@ -26,33 +60,28 @@ export function PortalUsers() {
     [users],
   )
 
+  const filtered = useMemo(() => {
+    if (statusFilter === 'all') return users
+    return users.filter((u) => u.status === statusFilter)
+  }, [users, statusFilter])
+
+  const refreshUsers = useCallback(async () => {
+    if (session.isMock || !isApiConfigured() || !session.tenant) return
+    const data = await listOrgUsers(session.tenant)
+    setUsers(mapApiUsers(data.users || []))
+  }, [session.isMock, session.tenant])
+
   useEffect(() => {
     if (session.isMock || !isApiConfigured() || !session.tenant) return
     let cancelled = false
     listOrgUsers(session.tenant)
       .then((data) => {
         if (cancelled) return
-        const rows = (data.users || []).map(
-          (u: {
-            id: string
-            name: string
-            email: string
-            role: string
-            apps: string[]
-            status: string
-          }) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role as PortalRole,
-            apps: u.apps || ['raven'],
-            status: u.status as PortalUser['status'],
-          }),
-        )
-        setUsers(rows)
+        setUsers(mapApiUsers(data.users || []))
+        setListError('')
       })
-      .catch(() => {
-        /* keep empty */
+      .catch((err) => {
+        if (!cancelled) setListError(err instanceof Error ? err.message : 'Could not load users')
       })
     return () => {
       cancelled = true
@@ -72,7 +101,8 @@ export function PortalUsers() {
   async function addUser(e: FormEvent) {
     e.preventDefault()
     setFormError('')
-    setInviteToken('')
+    setFormSuccess('')
+    setInviteLink('')
     if (!name.trim() || !email.trim() || !email.includes('@')) {
       setFormError('Name and a valid email are required.')
       return
@@ -81,7 +111,7 @@ export function PortalUsers() {
       setFormError(`Seat limit reached (${seats.limit}).`)
       return
     }
-    if (users.some((u) => u.email === email.trim().toLowerCase())) {
+    if (users.some((u) => u.email === email.trim().toLowerCase() && u.status !== 'disabled')) {
       setFormError('That email is already on the workspace.')
       return
     }
@@ -95,12 +125,14 @@ export function PortalUsers() {
           role: role === 'owner' ? 'admin' : role,
           apps: ['raven'],
           status: 'invited',
+          synced: false,
         },
         ...prev,
       ])
       setName('')
       setEmail('')
       setRole('member')
+      setFormSuccess('Invite added (demo — not synced to Frappe).')
       return
     }
 
@@ -114,28 +146,17 @@ export function PortalUsers() {
         apps: session.appIds,
       })
       if (result.invite_token) {
-        setInviteToken(result.invite_token)
+        const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(result.invite_token)}`
+        setInviteLink(link)
       }
-      const data = await listOrgUsers(session.tenant)
-      setUsers(
-        (data.users || []).map(
-          (u: {
-            id: string
-            name: string
-            email: string
-            role: string
-            apps: string[]
-            status: string
-          }) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role as PortalRole,
-            apps: u.apps || ['raven'],
-            status: u.status as PortalUser['status'],
-          }),
-        ),
-      )
+      if (result.synced) {
+        setFormSuccess('User invited and synced to the workspace (Frappe). Share the accept link so they can set a password.')
+      } else if (result.sync_error) {
+        setFormSuccess(`Invite created, but sync failed: ${result.sync_error}`)
+      } else {
+        setFormSuccess(result.message || 'Invite created.')
+      }
+      await refreshUsers()
       setName('')
       setEmail('')
       setRole('member')
@@ -146,11 +167,56 @@ export function PortalUsers() {
     }
   }
 
-  function setStatus(id: string, status: PortalUser['status']) {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)))
+  async function toggleStatus(u: PortalUser) {
+    if (u.role === 'owner') return
+    const next = u.status === 'disabled' ? 'Active' : 'Disabled'
+    if (session.isMock || !isApiConfigured() || !session.tenant) {
+      setUsers((prev) =>
+        prev.map((row) =>
+          row.id === u.id ? { ...row, status: next === 'Active' ? 'active' : 'disabled' } : row,
+        ),
+      )
+      return
+    }
+    setRowBusy(u.id)
+    setFormError('')
+    try {
+      await setOrgUserStatus({
+        tenant: session.tenant,
+        membership_id: u.id,
+        status: next,
+      })
+      await refreshUsers()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not update status')
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  async function resync(u: PortalUser) {
+    if (session.isMock || !isApiConfigured() || !session.tenant) return
+    setRowBusy(u.id)
+    setFormError('')
+    setFormSuccess('')
+    try {
+      await syncOrgUser({ tenant: session.tenant, membership_id: u.id })
+      setFormSuccess(`Synced ${u.email} to the workspace.`)
+      await refreshUsers()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setRowBusy(null)
+    }
   }
 
   const atLimit = seats.used >= seats.limit
+  const filters: { id: StatusFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'active', label: 'Active' },
+    { id: 'invited', label: 'Invited' },
+    { id: 'disabled', label: 'Inactive' },
+  ]
 
   return (
     <section className="page page--wide portal">
@@ -162,7 +228,7 @@ export function PortalUsers() {
             <span className={atLimit ? 'portal-users__seats--full' : ''}>
               {seats.used} / {seats.limit} seats
             </span>
-            {session.isMock ? ' · design mock' : ' · portal invites'}
+            {session.isMock ? ' · design mock' : ' · syncs to workspace on invite'}
           </p>
         </div>
       </header>
@@ -199,18 +265,53 @@ export function PortalUsers() {
             {formError}
           </p>
         )}
-        {inviteToken && (
+        {formSuccess && (
+          <p className="form__hint portal-users__success" role="status">
+            {formSuccess}
+          </p>
+        )}
+        {inviteLink && (
           <p className="form__hint">
-            Invite created. Accept URL token: <code>{inviteToken}</code> (email delivery comes
-            later — share <code>/accept-invite?token=…</code> manually for now).
+            Accept link:{' '}
+            <a href={inviteLink} target="_blank" rel="noreferrer">
+              {inviteLink}
+            </a>
           </p>
         )}
       </form>
 
-      {users.length === 0 ? (
+      <div className="portal-users__toolbar">
+        <div className="portal-users__filters" role="tablist" aria-label="Filter by status">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === f.id}
+              className={`portal-users__filter${statusFilter === f.id ? ' portal-users__filter--on' : ''}`}
+              onClick={() => setStatusFilter(f.id)}
+            >
+              {f.label}
+              <span className="portal-users__filter-count">
+                {f.id === 'all' ? users.length : users.filter((u) => u.status === f.id).length}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {listError && (
+        <p className="form__error" role="alert">
+          {listError}
+        </p>
+      )}
+
+      {filtered.length === 0 ? (
         <div className="portal__empty">
-          <p>No users yet.</p>
-          <p className="portal__empty-hint">Invite your first teammate above.</p>
+          <p>No users in this filter.</p>
+          <p className="portal__empty-hint">
+            {users.length === 0 ? 'Invite your first teammate above.' : 'Try another status filter.'}
+          </p>
         </div>
       ) : (
         <div className="portal-users__table-wrap">
@@ -222,11 +323,12 @@ export function PortalUsers() {
                 <th>Role</th>
                 <th>Apps</th>
                 <th>Status</th>
+                <th>Sync</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filtered.map((u) => (
                 <tr key={u.id}>
                   <td data-label="Name">{u.name}</td>
                   <td data-label="Email">{u.email}</td>
@@ -238,28 +340,37 @@ export function PortalUsers() {
                   </td>
                   <td data-label="Status">
                     <span className={`portal-users__status portal-users__status--${u.status}`}>
-                      {u.status}
+                      {u.status === 'disabled' ? 'inactive' : u.status}
+                    </span>
+                  </td>
+                  <td data-label="Sync">
+                    <span
+                      className={`portal-users__sync${u.synced ? ' portal-users__sync--ok' : ''}`}
+                    >
+                      {u.synced ? 'Synced' : 'Pending'}
                     </span>
                   </td>
                   <td className="portal-users__row-actions" data-label="">
-                    {session.isMock &&
-                      (u.status !== 'disabled' ? (
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={() => setStatus(u.id, 'disabled')}
-                        >
-                          Disable
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={() => setStatus(u.id, 'active')}
-                        >
-                          Enable
-                        </button>
-                      ))}
+                    {u.role !== 'owner' && (
+                      <button
+                        type="button"
+                        className="linkish"
+                        disabled={rowBusy === u.id}
+                        onClick={() => toggleStatus(u)}
+                      >
+                        {u.status === 'disabled' ? 'Enable' : 'Disable'}
+                      </button>
+                    )}
+                    {!session.isMock && u.status !== 'disabled' && (
+                      <button
+                        type="button"
+                        className="linkish"
+                        disabled={rowBusy === u.id}
+                        onClick={() => resync(u)}
+                      >
+                        {rowBusy === u.id ? '…' : 'Sync'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
