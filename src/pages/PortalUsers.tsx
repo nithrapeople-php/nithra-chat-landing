@@ -4,6 +4,7 @@ import {
   inviteOrgUser,
   isApiConfigured,
   listOrgUsers,
+  localPreviewRoles,
   setOrgUserStatus,
   syncOrgUser,
 } from '../lib/api'
@@ -40,10 +41,17 @@ function mapApiUsers(rows: ApiUser[]): PortalUser[] {
 export function PortalUsers() {
   const session = readUnifiedSession()!
   const canManage = session.role === 'owner' || session.role === 'admin'
+  const orgApps = useMemo(() => {
+    const ids = session.appIds?.length ? session.appIds : ['raven']
+    return ALL_APPS.filter((a) => ids.includes(a.id) || a.id === 'raven')
+  }, [session.appIds])
   const [users, setUsers] = useState<PortalUser[]>(() => (session.isMock ? [...MOCK_USERS] : []))
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<PortalRole>('member')
+  const [selectedApps, setSelectedApps] = useState<string[]>(() =>
+    session.appIds?.length ? [...session.appIds] : ['raven'],
+  )
   const [password, setPassword] = useState('')
   const [sendWelcomeEmail, setSendWelcomeEmail] = useState(false)
   const [formError, setFormError] = useState('')
@@ -53,6 +61,11 @@ export function PortalUsers() {
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [listError, setListError] = useState('')
+
+  const frappeRolesPreview = useMemo(
+    () => localPreviewRoles(role, selectedApps),
+    [role, selectedApps],
+  )
 
   const seats = useMemo(
     () => ({
@@ -113,6 +126,10 @@ export function PortalUsers() {
       setFormError('Password is required (min 8 characters).')
       return
     }
+    if (selectedApps.length === 0) {
+      setFormError('Select at least one app.')
+      return
+    }
     if (seats.used >= seats.limit) {
       setFormError(`Seat limit reached (${seats.limit}).`)
       return
@@ -129,7 +146,7 @@ export function PortalUsers() {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           role: role === 'owner' ? 'admin' : role,
-          apps: ['raven'],
+          apps: selectedApps,
           status: 'active',
           synced: false,
         },
@@ -140,6 +157,7 @@ export function PortalUsers() {
       setRole('member')
       setPassword('')
       setSendWelcomeEmail(false)
+      setSelectedApps(session.appIds?.length ? [...session.appIds] : ['raven'])
       setFormSuccess('User added with password (demo — not synced to Frappe).')
       return
     }
@@ -151,7 +169,7 @@ export function PortalUsers() {
         email: email.trim().toLowerCase(),
         full_name: name.trim(),
         role: role === 'owner' ? 'Admin' : role,
-        apps: session.appIds,
+        apps: selectedApps,
         password,
         send_welcome_email: sendWelcomeEmail,
       })
@@ -174,6 +192,7 @@ export function PortalUsers() {
       setRole('member')
       setPassword('')
       setSendWelcomeEmail(false)
+      setSelectedApps(session.appIds?.length ? [...session.appIds] : ['raven'])
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Invite failed')
     } finally {
@@ -298,8 +317,39 @@ export function PortalUsers() {
             </span>
           </label>
         </div>
+
+        <fieldset className="portal-users__apps">
+          <legend>Apps</legend>
+          <div className="portal-users__apps-list">
+            {orgApps.map((app) => (
+              <label key={app.id} className="portal-users__check">
+                <input
+                  type="checkbox"
+                  checked={selectedApps.includes(app.id)}
+                  onChange={(e) => {
+                    setSelectedApps((prev) =>
+                      e.target.checked
+                        ? [...prev, app.id]
+                        : prev.filter((id) => id !== app.id),
+                    )
+                  }}
+                />
+                <span>{app.label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="form__hint portal-users__roles-preview">
+            Frappe roles to sync:{' '}
+            <strong>{frappeRolesPreview.length ? frappeRolesPreview.join(', ') : '—'}</strong>
+            <span className="form__optional">
+              {' '}
+              (permissions stay on these roles per app — not edited here)
+            </span>
+          </p>
+        </fieldset>
+
         <p className="form__hint portal-users__invite-hint">
-          Password is required. It activates the user and syncs to Frappe.
+          Password is required. Portal role + apps map to Frappe roles on the workspace.
         </p>
         {formError && (
           <p className="form__error" role="alert">

@@ -254,6 +254,39 @@ export async function inviteOrgUser(payload: {
   return data.message ?? data
 }
 
+export async function previewInviteRoles(payload: {
+  role: string
+  apps: string[]
+}): Promise<{ frappe_roles: string[]; note?: string }> {
+  const res = await fetch(authMethodUrl('preview_invite_roles'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    // Fallback local map if API not upgraded yet
+    return { frappe_roles: localPreviewRoles(payload.role, payload.apps) }
+  }
+  const data = await res.json()
+  return data.message ?? data
+}
+
+/** Mirrors nithra_saas.auth.sync APP_ROLE_MAP for offline / pre-upgrade UI */
+export function localPreviewRoles(role: string, apps: string[]): string[] {
+  const portalRole = role === 'admin' || role === 'Admin' ? 'Admin' : 'Member'
+  const base = portalRole === 'Admin' ? ['System Manager'] : []
+  const chat =
+    portalRole === 'Admin'
+      ? ['Raven User', 'Raven Admin']
+      : ['Raven User']
+  const out = [...base]
+  const keys = new Set((apps || []).map((a) => a.toLowerCase()))
+  if (keys.has('raven') || keys.has('chat') || keys.has('nithra-chat')) {
+    out.push(...chat)
+  }
+  return [...new Set(out)]
+}
+
 export async function setOrgUserStatus(payload: {
   tenant: string
   membership_id: string
