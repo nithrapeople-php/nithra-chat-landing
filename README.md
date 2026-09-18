@@ -49,11 +49,13 @@ Same variable **names**, different **values**:
 
 ## Frappe API (central site — `nithra_saas` app)
 
-Whitelisted methods (Phase 3):
+Whitelisted methods:
 
 - `nithra_saas.api.signup.create_tenant`
 - `nithra_saas.api.signup.get_status`
 - `nithra_saas.api.signup.resolve_workspace`
+- `nithra_saas.api.auth.login` / `logout` / `me`
+- `nithra_saas.api.auth.get_app_handoff` — SSO Open Chat/CRM (not `/raven/login`)
 
 On the central site, set `allow_cors` in `site_config.json` to your landing origin(s), e.g.:
 
@@ -62,6 +64,8 @@ On the central site, set `allow_cors` in `site_config.json` to your landing orig
   "allow_cors": ["https://yoursite.netlify.app", "http://localhost:5173"]
 }
 ```
+
+Also set Desk → Nithra SaaS Settings → **Central Public URL** and **Portal Login URL**. Tenant sites need the `nithra_tenant_auth` app.
 
 Without a real `VITE_FRAPPE_API_URL`, signup runs in **demo mode**.
 

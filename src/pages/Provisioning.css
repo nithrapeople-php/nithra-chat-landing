@@ -73,6 +73,13 @@
   background: var(--accent-2);
 }
 
+.provision__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 @keyframes provision-slide {
   0% {
     transform: translateX(-20%);

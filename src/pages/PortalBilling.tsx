@@ -5,16 +5,16 @@ import {
   MOCK_INVOICES,
   PORTAL_PLANS,
   planById,
-  readMockSession,
   saveMockSession,
   type PortalPlanId,
 } from '../data/portalMock'
+import { readUnifiedSession } from '../lib/portalSession'
 import './Page.css'
 import './PortalHome.css'
 import './PortalBilling.css'
 
 export function PortalBilling() {
-  const session = readMockSession()!
+  const session = readUnifiedSession()!
   const canManage = session.role === 'owner' || session.role === 'admin'
   const [planId, setPlanId] = useState<PortalPlanId>(session.planId)
   const [note, setNote] = useState('')
@@ -36,17 +36,22 @@ export function PortalBilling() {
 
   function selectPlan(id: PortalPlanId) {
     setPlanId(id)
-    const next = {
-      ...session,
-      planId: id,
-      appIds:
-        session.role === 'member'
-          ? session.appIds.filter((a) => (id === 'chat' ? a === 'raven' : true))
-          : id === 'chat'
-            ? ['raven']
-            : ['raven', 'crm'],
+    if (session.isMock) {
+      saveMockSession({
+        email: session.email,
+        name: session.name,
+        role: session.role,
+        orgName: session.orgName,
+        subdomain: session.subdomain,
+        planId: id,
+        appIds:
+          session.role === 'member'
+            ? session.appIds.filter((a) => (id === 'chat' ? a === 'raven' : true))
+            : id === 'chat'
+              ? ['raven']
+              : ['raven', 'crm'],
+      })
     }
-    saveMockSession(next)
     setNote(
       id === session.planId
         ? ''

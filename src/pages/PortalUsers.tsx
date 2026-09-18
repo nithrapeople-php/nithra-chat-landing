@@ -1,25 +1,22 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import {
-  ALL_APPS,
-  MOCK_SEATS,
-  MOCK_USERS,
-  readMockSession,
-  type PortalRole,
-  type PortalUser,
-} from '../data/portalMock'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { ALL_APPS, MOCK_SEATS, MOCK_USERS, type PortalRole, type PortalUser } from '../data/portalMock'
+import { inviteOrgUser, isApiConfigured, listOrgUsers } from '../lib/api'
+import { readUnifiedSession } from '../lib/portalSession'
 import './Form.css'
 import './Page.css'
 import './PortalHome.css'
 import './PortalUsers.css'
 
 export function PortalUsers() {
-  const session = readMockSession()!
+  const session = readUnifiedSession()!
   const canManage = session.role === 'owner' || session.role === 'admin'
-  const [users, setUsers] = useState<PortalUser[]>(() => [...MOCK_USERS])
+  const [users, setUsers] = useState<PortalUser[]>(() => (session.isMock ? [...MOCK_USERS] : []))
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<PortalRole>('member')
   const [formError, setFormError] = useState('')
+  const [inviteToken, setInviteToken] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const seats = useMemo(
     () => ({
@@ -29,26 +26,59 @@ export function PortalUsers() {
     [users],
   )
 
+  useEffect(() => {
+    if (session.isMock || !isApiConfigured() || !session.tenant) return
+    let cancelled = false
+    listOrgUsers(session.tenant)
+      .then((data) => {
+        if (cancelled) return
+        const rows = (data.users || []).map(
+          (u: {
+            id: string
+            name: string
+            email: string
+            role: string
+            apps: string[]
+            status: string
+          }) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role as PortalRole,
+            apps: u.apps || ['raven'],
+            status: u.status as PortalUser['status'],
+          }),
+        )
+        setUsers(rows)
+      })
+      .catch(() => {
+        /* keep empty */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session.isMock, session.tenant])
+
   if (!canManage) {
     return (
       <section className="page page--wide portal">
         <div className="portal__empty">
           <p>You don’t have permission to manage users.</p>
-          <p className="portal__empty-hint">Ask an owner or admin, or use the Ada demo persona.</p>
         </div>
       </section>
     )
   }
 
-  function addUser(e: FormEvent) {
+  async function addUser(e: FormEvent) {
     e.preventDefault()
     setFormError('')
+    setInviteToken('')
     if (!name.trim() || !email.trim() || !email.includes('@')) {
       setFormError('Name and a valid email are required.')
       return
     }
     if (seats.used >= seats.limit) {
-      setFormError(`Seat limit reached (${seats.limit}). Upgrade the plan to invite more.`)
+      setFormError(`Seat limit reached (${seats.limit}).`)
       return
     }
     if (users.some((u) => u.email === email.trim().toLowerCase())) {
@@ -56,20 +86,64 @@ export function PortalUsers() {
       return
     }
 
-    setUsers((prev) => [
-      {
-        id: String(Date.now()),
-        name: name.trim(),
+    if (session.isMock || !isApiConfigured() || !session.tenant) {
+      setUsers((prev) => [
+        {
+          id: String(Date.now()),
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          role: role === 'owner' ? 'admin' : role,
+          apps: ['raven'],
+          status: 'invited',
+        },
+        ...prev,
+      ])
+      setName('')
+      setEmail('')
+      setRole('member')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await inviteOrgUser({
+        tenant: session.tenant,
         email: email.trim().toLowerCase(),
-        role,
-        apps: ['raven'],
-        status: 'invited',
-      },
-      ...prev,
-    ])
-    setName('')
-    setEmail('')
-    setRole('member')
+        full_name: name.trim(),
+        role: role === 'owner' ? 'Admin' : role,
+        apps: session.appIds,
+      })
+      if (result.invite_token) {
+        setInviteToken(result.invite_token)
+      }
+      const data = await listOrgUsers(session.tenant)
+      setUsers(
+        (data.users || []).map(
+          (u: {
+            id: string
+            name: string
+            email: string
+            role: string
+            apps: string[]
+            status: string
+          }) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role as PortalRole,
+            apps: u.apps || ['raven'],
+            status: u.status as PortalUser['status'],
+          }),
+        ),
+      )
+      setName('')
+      setEmail('')
+      setRole('member')
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Invite failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function setStatus(id: string, status: PortalUser['status']) {
@@ -88,8 +162,7 @@ export function PortalUsers() {
             <span className={atLimit ? 'portal-users__seats--full' : ''}>
               {seats.used} / {seats.limit} seats
             </span>
-            {' · '}
-            design mock (local state only)
+            {session.isMock ? ' · design mock' : ' · portal invites'}
           </p>
         </div>
       </header>
@@ -115,11 +188,10 @@ export function PortalUsers() {
             <select value={role} onChange={(e) => setRole(e.target.value as PortalRole)}>
               <option value="member">Member</option>
               <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
             </select>
           </label>
-          <button className="btn btn--primary" type="submit" disabled={atLimit}>
-            Add
+          <button className="btn btn--primary" type="submit" disabled={atLimit || loading}>
+            {loading ? 'Inviting…' : 'Invite'}
           </button>
         </div>
         {formError && (
@@ -127,8 +199,11 @@ export function PortalUsers() {
             {formError}
           </p>
         )}
-        {atLimit && !formError && (
-          <p className="form__hint">Seat limit reached — disable someone or upgrade (mock).</p>
+        {inviteToken && (
+          <p className="form__hint">
+            Invite created. Accept URL token: <code>{inviteToken}</code> (email delivery comes
+            later — share <code>/accept-invite?token=…</code> manually for now).
+          </p>
         )}
       </form>
 
@@ -167,23 +242,24 @@ export function PortalUsers() {
                     </span>
                   </td>
                   <td className="portal-users__row-actions" data-label="">
-                    {u.status !== 'disabled' ? (
-                      <button
-                        type="button"
-                        className="linkish"
-                        onClick={() => setStatus(u.id, 'disabled')}
-                      >
-                        Disable
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="linkish"
-                        onClick={() => setStatus(u.id, 'active')}
-                      >
-                        Enable
-                      </button>
-                    )}
+                    {session.isMock &&
+                      (u.status !== 'disabled' ? (
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => setStatus(u.id, 'disabled')}
+                        >
+                          Disable
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => setStatus(u.id, 'active')}
+                        >
+                          Enable
+                        </button>
+                      ))}
                   </td>
                 </tr>
               ))}

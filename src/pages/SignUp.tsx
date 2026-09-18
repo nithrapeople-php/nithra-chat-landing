@@ -7,7 +7,8 @@ import {
   catalogByCategory,
   defaultSelectedAppIds,
 } from '../data/appCatalog'
-import { isApiConfigured, type SignupPayload } from '../lib/api'
+import { isApiConfigured, signupTenant, type SignupPayload } from '../lib/api'
+import { persistApiSession, saveDemoSession, defaultMockSession } from '../lib/portalSession'
 import './Form.css'
 import './Page.css'
 import './SignUp.css'
@@ -15,6 +16,7 @@ import './SignUp.css'
 type Step = 'apps' | 'details'
 
 const SIGNUP_STORAGE_PREFIX = 'nithra-signup:'
+const JOB_STORAGE_PREFIX = 'nithra-job:'
 
 export function SignUp() {
   const navigate = useNavigate()
@@ -24,7 +26,10 @@ export function SignUp() {
   const [subdomain, setSubdomain] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [password2, setPassword2] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const groups = useMemo(() => catalogByCategory(), [])
   const selectedApps = useMemo(
@@ -48,7 +53,7 @@ export function SignUp() {
     setStep('details')
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
 
@@ -57,6 +62,7 @@ export function SignUp() {
       subdomain: subdomain.trim().toLowerCase(),
       adminName: adminName.trim(),
       adminEmail: adminEmail.trim().toLowerCase(),
+      password,
       apps: appNamesFromIds(selectedIds),
     }
 
@@ -64,25 +70,54 @@ export function SignUp() {
       setError('Please fill in all fields.')
       return
     }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    if (password !== password2) {
+      setError('Passwords do not match.')
+      return
+    }
 
     if (!isApiConfigured()) {
+      saveDemoSession(
+        defaultMockSession(payload.adminEmail, {
+          name: payload.adminName,
+          orgName: payload.company,
+          subdomain: payload.subdomain,
+          role: 'owner',
+          appIds: payload.apps?.filter((a) => a !== 'frappe') || ['raven'],
+        }),
+      )
       const fakeJob = `local-${payload.subdomain}-${Date.now()}`
       navigate(
-        `/provisioning?job=${encodeURIComponent(fakeJob)}&subdomain=${encodeURIComponent(payload.subdomain)}`,
+        `/home?job=${encodeURIComponent(fakeJob)}&subdomain=${encodeURIComponent(payload.subdomain)}`,
       )
       return
     }
 
-    // Redirect immediately; Provisioning page creates the tenant + polls.
+    setLoading(true)
     try {
-      sessionStorage.setItem(`${SIGNUP_STORAGE_PREFIX}${payload.subdomain}`, JSON.stringify(payload))
-    } catch {
-      /* private mode — location.state still works for this navigation */
+      const result = await signupTenant(payload)
+      if (result.token && result.session) {
+        persistApiSession({ ...result.session, token: result.token })
+      }
+      if (result.jobId) {
+        try {
+          sessionStorage.setItem(`${JOB_STORAGE_PREFIX}${payload.subdomain}`, result.jobId)
+          sessionStorage.removeItem(`${SIGNUP_STORAGE_PREFIX}${payload.subdomain}`)
+        } catch {
+          /* ignore */
+        }
+      }
+      navigate(
+        `/home?job=${encodeURIComponent(result.jobId || '')}&subdomain=${encodeURIComponent(payload.subdomain)}`,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Signup failed.')
+    } finally {
+      setLoading(false)
     }
-
-    navigate(`/provisioning?subdomain=${encodeURIComponent(payload.subdomain)}`, {
-      state: { signup: payload },
-    })
   }
 
   if (step === 'apps') {
@@ -147,7 +182,7 @@ export function SignUp() {
         <p className="eyebrow">Step 2 of 2</p>
         <h1>Create your workspace</h1>
         <p className="lede">
-          Company + admin email. We’ll provision a site with your selected apps.
+          Create your portal account. We’ll provision your site in the background.
         </p>
         <ul className="selected-apps">
           {selectedApps.map((a) => (
@@ -211,24 +246,50 @@ export function SignUp() {
           />
         </label>
 
+        <label>
+          Password
+          <input
+            required
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+            minLength={8}
+          />
+        </label>
+
+        <label>
+          Confirm password
+          <input
+            required
+            type="password"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            placeholder="Repeat password"
+            autoComplete="new-password"
+            minLength={8}
+          />
+        </label>
+
         {!isApiConfigured() && (
           <p className="form__hint">
-            API not configured yet — submit will open the provisioning screen in
-            demo mode. Set <code>VITE_FRAPPE_API_URL</code> when your central
-            site is ready.
+            API not configured yet — submit opens the portal in demo mode. Set{' '}
+            <code>VITE_FRAPPE_API_URL</code> when your central site is ready.
           </p>
         )}
 
         {error && <p className="form__error">{error}</p>}
 
-        <button className="btn btn--primary" type="submit">
-          Start now
+        <button className="btn btn--primary" type="submit" disabled={loading}>
+          {loading ? 'Creating account…' : 'Create account'}
         </button>
 
         <p className="form__footer-note">
           By creating a workspace you agree to our{' '}
           <Link to="/terms">Terms of Service</Link> and{' '}
-          <Link to="/privacy">Privacy Policy</Link>.
+          <Link to="/privacy">Privacy Policy</Link>. Already have an account?{' '}
+          <Link to="/signin">Sign in</Link>
         </p>
       </form>
     </section>

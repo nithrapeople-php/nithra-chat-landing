@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
+  chatLoginUrl,
+  getAppHandoff,
   getProvisioningStatus,
   isApiConfigured,
+  readPortalSession,
   signupTenant,
   tenantUrlFromSubdomain,
   type ProvisioningStatus,
@@ -213,10 +216,42 @@ export function Provisioning() {
           <li className={status.status === 'ready' ? 'is-done' : ''}>Workspace ready</li>
         </ul>
 
-        {status.status === 'ready' && status.siteUrl && (
-          <a className="btn btn--primary" href={status.siteUrl}>
-            Open workspace
-          </a>
+        {status.status === 'ready' && (
+          <div className="provision__actions">
+            <Link to="/home" className="btn btn--primary">
+              Open portal
+            </Link>
+            {(status.siteUrl || status.chatUrl) && (
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={async () => {
+                  const session = readPortalSession()
+                  const tenant = status.tenant || session?.org?.tenant || session?.orgs?.[0]?.tenant
+                  const site = status.siteUrl
+                  if (session?.token && tenant && isApiConfigured()) {
+                    try {
+                      const { handoffUrl } = await getAppHandoff({
+                        tenant,
+                        app: 'raven',
+                        path: '/raven',
+                      })
+                      window.location.href = handoffUrl
+                      return
+                    } catch {
+                      /* fall through */
+                    }
+                  }
+                  const fallback =
+                    status.chatUrl ||
+                    (site ? chatLoginUrl(site) : undefined)
+                  if (fallback) window.location.href = fallback
+                }}
+              >
+                Open Chat
+              </button>
+            )}
+          </div>
         )}
 
         {status.status === 'failed' && (

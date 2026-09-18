@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { brand, TENANT_BASE_DOMAIN } from '../config'
+import { isApiConfigured, portalLogin } from '../lib/api'
 import {
   defaultMockSession,
-  saveMockSession,
+  persistApiSession,
+  saveDemoSession,
+} from '../lib/portalSession'
+import {
   type PortalPlanId,
   type PortalRole,
 } from '../data/portalMock'
@@ -51,7 +55,6 @@ const PERSONAS: DemoPersona[] = [
   },
 ]
 
-/** Design mock — no API. Continue → /home */
 export function SignIn() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -62,9 +65,9 @@ export function SignIn() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function enterAs(persona?: DemoPersona, nextEmail?: string) {
+  function enterDemo(persona?: DemoPersona, nextEmail?: string) {
     if (persona) {
-      saveMockSession(
+      saveDemoSession(
         defaultMockSession(persona.email, {
           role: persona.role,
           planId: persona.planId,
@@ -73,7 +76,7 @@ export function SignIn() {
         }),
       )
     } else {
-      saveMockSession(
+      saveDemoSession(
         defaultMockSession(nextEmail || 'ada@acme.com', {
           subdomain: subdomain.trim() || 'acme',
         }),
@@ -82,21 +85,34 @@ export function SignIn() {
     navigate('/home')
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setLoading(true)
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed || !trimmed.includes('@')) {
+      setError('Enter a valid work email.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password.')
+      return
+    }
 
-    window.setTimeout(() => {
-      const trimmed = email.trim()
-      if (trimmed && !trimmed.includes('@')) {
-        setLoading(false)
-        setError('Enter a valid work email, pick a demo persona, or leave blank for Ada.')
-        return
-      }
+    if (!isApiConfigured()) {
+      enterDemo(undefined, trimmed)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const session = await portalLogin(trimmed, password)
+      persistApiSession(session)
+      navigate('/home')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed.')
+    } finally {
       setLoading(false)
-      enterAs(undefined, trimmed || 'ada@acme.com')
-    }, 280)
+    }
   }
 
   return (
@@ -106,27 +122,29 @@ export function SignIn() {
           <p className="eyebrow">Sign in</p>
           <h1>Welcome back</h1>
           <p className="lede">
-            Enter your work email to open {brand.name}. You don’t need to remember a site name.
+            Enter your work email and password to open {brand.name}. You don’t need a site name.
           </p>
         </div>
 
-        <div className="signin__demos" aria-label="Demo personas">
-          <p className="signin__demos-label">Quick demo</p>
-          <div className="signin__demo-row">
-            {PERSONAS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="signin__demo"
-                onClick={() => enterAs(p)}
-                title={p.blurb}
-              >
-                <span className="signin__demo-title">{p.label}</span>
-                <span className="signin__demo-blurb">{p.blurb}</span>
-              </button>
-            ))}
+        {!isApiConfigured() && (
+          <div className="signin__demos" aria-label="Demo personas">
+            <p className="signin__demos-label">Quick demo (API not configured)</p>
+            <div className="signin__demo-row">
+              {PERSONAS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="signin__demo"
+                  onClick={() => enterDemo(p)}
+                  title={p.blurb}
+                >
+                  <span className="signin__demo-title">{p.label}</span>
+                  <span className="signin__demo-blurb">{p.blurb}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <form className="form signin__form" onSubmit={onSubmit} noValidate>
           <label>
@@ -137,6 +155,7 @@ export function SignIn() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
               autoComplete="username"
+              required
             />
           </label>
 
@@ -149,6 +168,7 @@ export function SignIn() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
+                required={isApiConfigured()}
               />
               <button
                 type="button"
@@ -160,9 +180,6 @@ export function SignIn() {
               </button>
             </div>
           </label>
-          <p className="form__hint signin__hint">
-            Design mock — no server. Continue or use a demo persona above.
-          </p>
 
           {error && (
             <p className="form__error" role="alert">
@@ -171,40 +188,42 @@ export function SignIn() {
           )}
 
           <button className="btn btn--primary signin__submit" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : 'Continue'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <div className="signin__advanced">
-          <button
-            type="button"
-            className="signin__advanced-toggle"
-            aria-expanded={advancedOpen}
-            onClick={() => setAdvancedOpen((o) => !o)}
-          >
-            {advancedOpen ? 'Hide advanced' : 'Advanced — use workspace subdomain'}
-          </button>
+        {!isApiConfigured() && (
+          <div className="signin__advanced">
+            <button
+              type="button"
+              className="signin__advanced-toggle"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((o) => !o)}
+            >
+              {advancedOpen ? 'Hide advanced' : 'Advanced — use workspace subdomain'}
+            </button>
 
-          {advancedOpen && (
-            <div className="signin__advanced-body">
-              <p className="form__hint">Optional mock subdomain stored on the preview session.</p>
-              <label>
-                Workspace subdomain
-                <div className="form__subdomain">
-                  <input
-                    value={subdomain}
-                    onChange={(e) =>
-                      setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
-                    }
-                    placeholder="acme"
-                    autoComplete="off"
-                  />
-                  <span>.{TENANT_BASE_DOMAIN}</span>
-                </div>
-              </label>
-            </div>
-          )}
-        </div>
+            {advancedOpen && (
+              <div className="signin__advanced-body">
+                <p className="form__hint">Optional mock subdomain for the design preview.</p>
+                <label>
+                  Workspace subdomain
+                  <div className="form__subdomain">
+                    <input
+                      value={subdomain}
+                      onChange={(e) =>
+                        setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                      }
+                      placeholder="acme"
+                      autoComplete="off"
+                    />
+                    <span>.{TENANT_BASE_DOMAIN}</span>
+                  </div>
+                </label>
+              </div>
+            )}
+          </div>
+        )}
 
         <p className="form__footer-note signin__footer">
           New team? <Link to="/signup">Create a workspace</Link>

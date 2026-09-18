@@ -28,6 +28,15 @@
   font-weight: 550;
 }
 
+.portal__banner--info {
+  background: color-mix(in srgb, #3b82f6 12%, #fff);
+}
+
+.portal__banner--error {
+  background: color-mix(in srgb, #ef4444 14%, #fff);
+  color: #7f1d1d;
+}
+
 .portal__section-title {
   margin: 0 0 0.85rem;
   font-family: var(--font-display);

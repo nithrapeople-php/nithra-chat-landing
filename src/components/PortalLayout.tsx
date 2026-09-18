@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { brand } from '../config'
-import { clearMockSession, readMockSession } from '../data/portalMock'
+import { isApiConfigured, portalLogout } from '../lib/api'
+import { clearUnifiedSession, readUnifiedSession } from '../lib/portalSession'
 import './PortalShell.css'
 
 export function PortalLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const session = readMockSession()
+  const session = readUnifiedSession()
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -29,8 +30,13 @@ export function PortalLayout() {
 
   const canManageUsers = session.role === 'owner' || session.role === 'admin'
 
-  function signOut() {
-    clearMockSession()
+  async function signOut() {
+    const current = readUnifiedSession()
+    if (isApiConfigured() && current && !current.isMock) {
+      await portalLogout()
+    } else {
+      clearUnifiedSession()
+    }
     navigate('/signin')
   }
 
