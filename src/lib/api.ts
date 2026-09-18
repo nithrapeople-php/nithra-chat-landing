@@ -93,7 +93,8 @@ function authHeaders(token?: string | null): HeadersInit {
   }
   const t = token ?? readStoredToken()
   if (t) {
-    headers.Authorization = `Bearer ${t}`
+    // Do NOT send Authorization: Bearer — Frappe 16 treats Bearer as OAuth and
+    // returns AuthenticationError before our portal session check runs.
     headers['X-Nithra-Portal-Token'] = t
   }
   return headers
