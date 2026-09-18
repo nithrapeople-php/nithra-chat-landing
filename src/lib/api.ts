@@ -239,7 +239,7 @@ export async function inviteOrgUser(payload: {
   full_name: string
   role?: string
   apps?: string[]
-  password?: string
+  password: string
   send_welcome_email?: boolean
 }) {
   const res = await fetch(authMethodUrl('invite_user'), {

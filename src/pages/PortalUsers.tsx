@@ -109,8 +109,8 @@ export function PortalUsers() {
       setFormError('Name and a valid email are required.')
       return
     }
-    if (password && password.length < 8) {
-      setFormError('Password must be at least 8 characters (or leave blank for accept-invite link).')
+    if (!password || password.length < 8) {
+      setFormError('Password is required (min 8 characters).')
       return
     }
     if (seats.used >= seats.limit) {
@@ -130,7 +130,7 @@ export function PortalUsers() {
           email: email.trim().toLowerCase(),
           role: role === 'owner' ? 'admin' : role,
           apps: ['raven'],
-          status: password ? 'active' : 'invited',
+          status: 'active',
           synced: false,
         },
         ...prev,
@@ -140,11 +140,7 @@ export function PortalUsers() {
       setRole('member')
       setPassword('')
       setSendWelcomeEmail(false)
-      setFormSuccess(
-        password
-          ? 'User added with password (demo — not synced to Frappe).'
-          : 'Invite added (demo — not synced to Frappe).',
-      )
+      setFormSuccess('User added with password (demo — not synced to Frappe).')
       return
     }
 
@@ -156,7 +152,7 @@ export function PortalUsers() {
         full_name: name.trim(),
         role: role === 'owner' ? 'Admin' : role,
         apps: session.appIds,
-        password: password || undefined,
+        password,
         send_welcome_email: sendWelcomeEmail,
       })
       if (result.invite_token) {
@@ -168,13 +164,9 @@ export function PortalUsers() {
       } else if (result.message) {
         setFormSuccess(result.message)
       } else if (result.synced) {
-        setFormSuccess(
-          result.activated
-            ? 'User added with password and synced to the workspace.'
-            : 'User invited and synced. Share the accept link so they can set a password.',
-        )
+        setFormSuccess('User added with password and synced to the workspace.')
       } else {
-        setFormSuccess('Invite created.')
+        setFormSuccess('User created.')
       }
       await refreshUsers()
       setName('')
@@ -284,7 +276,7 @@ export function PortalUsers() {
         </div>
         <div className="portal-users__invite-extra">
           <label>
-            Password <span className="form__optional">(optional — synced to workspace)</span>
+            Password <span className="form__optional">(synced to workspace)</span>
             <input
               type="password"
               autoComplete="new-password"
@@ -292,6 +284,7 @@ export function PortalUsers() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min 8 characters"
               minLength={8}
+              required
             />
           </label>
           <label className="portal-users__check">
@@ -306,8 +299,7 @@ export function PortalUsers() {
           </label>
         </div>
         <p className="form__hint portal-users__invite-hint">
-          Set a password to activate the user now and sync it to Frappe. Leave blank to send an
-          accept-invite link instead.
+          Password is required. It activates the user and syncs to Frappe.
         </p>
         {formError && (
           <p className="form__error" role="alert">
