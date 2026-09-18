@@ -150,21 +150,30 @@ export function PortalHome() {
     }
 
     setOpeningApp(appId)
+    // Open blank tab synchronously so popup blockers allow SSO after await
+    const tab = window.open('about:blank', '_blank')
     try {
       const { handoffUrl } = await getAppHandoff({
         tenant: session.tenant,
         app: appId,
         path,
       })
-      window.location.href = handoffUrl
+      if (tab) {
+        tab.location.href = handoffUrl
+      } else {
+        window.location.href = handoffUrl
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not open app'
       setOpenError(msg)
-      // Fallback: tenant login page if SSO not ready on that site
-      if (path === '/raven' || path.startsWith('/raven')) {
-        window.open(chatLoginUrl(siteUrl), '_blank', 'noopener,noreferrer')
+      const fallback =
+        path === '/raven' || path.startsWith('/raven')
+          ? chatLoginUrl(siteUrl)
+          : `${siteUrl.replace(/\/$/, '')}${path}`
+      if (tab) {
+        tab.location.href = fallback
       } else {
-        window.open(`${siteUrl.replace(/\/$/, '')}${path}`, '_blank', 'noopener,noreferrer')
+        window.open(fallback, '_blank')
       }
     } finally {
       setOpeningApp(null)

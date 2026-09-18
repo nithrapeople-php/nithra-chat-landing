@@ -231,12 +231,14 @@ export function Provisioning() {
                   const site = status.siteUrl
                   if (session?.token && tenant && isApiConfigured()) {
                     try {
+                      const tab = window.open('about:blank', '_blank')
                       const { handoffUrl } = await getAppHandoff({
                         tenant,
                         app: 'raven',
                         path: '/raven',
                       })
-                      window.location.href = handoffUrl
+                      if (tab) tab.location.href = handoffUrl
+                      else window.location.href = handoffUrl
                       return
                     } catch {
                       /* fall through */
@@ -245,7 +247,7 @@ export function Provisioning() {
                   const fallback =
                     status.chatUrl ||
                     (site ? chatLoginUrl(site) : undefined)
-                  if (fallback) window.location.href = fallback
+                  if (fallback) window.open(fallback, '_blank')
                 }}
               >
                 Open Chat
