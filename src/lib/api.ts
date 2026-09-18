@@ -352,29 +352,43 @@ export async function getAppHandoff(opts: {
   app?: string
   path?: string
 }): Promise<{ handoffUrl: string; redirectPath?: string; siteUrl?: string }> {
-  const res = await fetch(authMethodUrl('get_app_handoff'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      tenant: opts.tenant,
-      app: opts.app || 'raven',
-      path: opts.path,
-      portal_token: readStoredToken(),
-    }),
-  })
-  if (!res.ok) {
-    throw new Error(await errorFromResponse(res))
-  }
-  const data = await res.json()
-  const message = data.message ?? data
-  const handoffUrl = message.handoff_url ?? message.handoffUrl
-  if (!handoffUrl) {
-    throw new Error('Handoff did not return a URL')
-  }
-  return {
-    handoffUrl,
-    redirectPath: message.redirect_path ?? message.redirectPath,
-    siteUrl: message.site_url ?? message.siteUrl,
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 45000)
+  try {
+    const res = await fetch(authMethodUrl('get_app_handoff'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        tenant: opts.tenant,
+        app: opts.app || 'raven',
+        path: opts.path,
+        portal_token: readStoredToken(),
+      }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      throw new Error(await errorFromResponse(res))
+    }
+    const data = await res.json()
+    const message = data.message ?? data
+    const handoffUrl = message.handoff_url ?? message.handoffUrl
+    if (!handoffUrl) {
+      throw new Error('Handoff did not return a URL')
+    }
+    return {
+      handoffUrl,
+      redirectPath: message.redirect_path ?? message.redirectPath,
+      siteUrl: message.site_url ?? message.siteUrl,
+    }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error(
+        'Open app timed out — try again (or Sync the user on Manage users first).',
+      )
+    }
+    throw e
+  } finally {
+    window.clearTimeout(timer)
   }
 }
 
