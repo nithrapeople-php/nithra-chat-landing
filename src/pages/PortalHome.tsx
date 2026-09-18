@@ -150,31 +150,37 @@ export function PortalHome() {
     }
 
     setOpeningApp(appId)
-    // Open blank tab synchronously so popup blockers allow SSO after await
+    // Sync open so the popup is allowed after await; show status while handoff is issued
     const tab = window.open('about:blank', '_blank')
+    if (tab) {
+      try {
+        tab.document.write(
+          '<!doctype html><title>Signing in…</title><p style="font:15px system-ui;padding:2rem">Signing you in…</p>',
+        )
+        tab.document.close()
+      } catch {
+        /* ignore cross-window write failures */
+      }
+    }
     try {
       const { handoffUrl } = await getAppHandoff({
         tenant: session.tenant,
-        app: appId,
+        app: appId === 'raven' || appId === 'chat' ? 'raven' : appId,
         path,
       })
-      if (tab) {
-        tab.location.href = handoffUrl
+      if (tab && !tab.closed) {
+        tab.location.replace(handoffUrl)
       } else {
-        window.location.href = handoffUrl
+        // Popup blocked — same-tab SSO still works
+        window.location.assign(handoffUrl)
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not open app'
       setOpenError(msg)
-      const fallback =
-        path === '/raven' || path.startsWith('/raven')
-          ? chatLoginUrl(siteUrl)
-          : `${siteUrl.replace(/\/$/, '')}${path}`
-      if (tab) {
-        tab.location.href = fallback
-      } else {
-        window.open(fallback, '_blank')
+      if (tab && !tab.closed) {
+        tab.close()
       }
+      // Do not open /raven/login — that skips SSO and looks like "auto login failed"
     } finally {
       setOpeningApp(null)
     }
@@ -223,7 +229,7 @@ export function PortalHome() {
 
       {openError && (
         <p className="portal__banner portal__banner--error">
-          SSO handoff issue: {openError}. Opened the app login as a fallback.
+          SSO handoff issue: {openError}. Fix this in the portal — do not use the app login page.
         </p>
       )}
 

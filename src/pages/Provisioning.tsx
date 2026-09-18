@@ -232,13 +232,23 @@ export function Provisioning() {
                   if (session?.token && tenant && isApiConfigured()) {
                     try {
                       const tab = window.open('about:blank', '_blank')
+                      if (tab) {
+                        try {
+                          tab.document.write(
+                            '<!doctype html><title>Signing in…</title><p style="font:15px system-ui;padding:2rem">Signing you in…</p>',
+                          )
+                          tab.document.close()
+                        } catch {
+                          /* ignore */
+                        }
+                      }
                       const { handoffUrl } = await getAppHandoff({
                         tenant,
                         app: 'raven',
                         path: '/raven',
                       })
-                      if (tab) tab.location.href = handoffUrl
-                      else window.location.href = handoffUrl
+                      if (tab && !tab.closed) tab.location.replace(handoffUrl)
+                      else window.location.assign(handoffUrl)
                       return
                     } catch {
                       /* fall through */
@@ -247,7 +257,7 @@ export function Provisioning() {
                   const fallback =
                     status.chatUrl ||
                     (site ? chatLoginUrl(site) : undefined)
-                  if (fallback) window.open(fallback, '_blank')
+                  if (fallback) window.location.assign(fallback)
                 }}
               >
                 Open Chat
