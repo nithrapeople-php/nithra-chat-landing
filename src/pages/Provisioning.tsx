@@ -251,7 +251,7 @@ export function Provisioning() {
                       app: 'raven',
                       path: '/raven',
                     })
-                    if (tab && !tab.closed) tab.location.replace(handoffUrl)
+                    if (tab && !tab.closed) tab.location.href = handoffUrl
                     else window.location.assign(handoffUrl)
                   } catch (e) {
                     const msg =

@@ -173,7 +173,8 @@ export function PortalHome() {
         path,
       })
       if (tab && !tab.closed) {
-        tab.location.replace(handoffUrl)
+        // href (not replace) is more reliable across browsers after about:blank
+        tab.location.href = handoffUrl
       } else {
         window.location.assign(handoffUrl)
       }
