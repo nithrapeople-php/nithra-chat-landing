@@ -150,12 +150,16 @@ export function PortalHome() {
     }
 
     setOpeningApp(appId)
-    // Sync open so the popup is allowed after await; show status while handoff is issued
+    // Open tab sync so popup blockers allow it after await
     const tab = window.open('about:blank', '_blank')
     if (tab) {
       try {
         tab.document.write(
-          '<!doctype html><title>Signing in…</title><p style="font:15px system-ui;padding:2rem">Signing you in…</p>',
+          '<!doctype html><title>Signing in…</title>' +
+            '<p style="font:15px system-ui;padding:2rem;max-width:28rem">' +
+            'Signing you in… This should take under a few seconds. ' +
+            'If it stalls, close this tab, open <b>Manage users</b>, Sync, then try again.' +
+            '</p>',
         )
         tab.document.close()
       } catch {
@@ -171,16 +175,25 @@ export function PortalHome() {
       if (tab && !tab.closed) {
         tab.location.replace(handoffUrl)
       } else {
-        // Popup blocked — same-tab SSO still works
         window.location.assign(handoffUrl)
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not open app'
       setOpenError(msg)
       if (tab && !tab.closed) {
-        tab.close()
+        try {
+          tab.document.open()
+          tab.document.write(
+            `<!doctype html><title>SSO failed</title>` +
+              `<p style="font:15px system-ui;padding:2rem;max-width:28rem;color:#b91c1c">` +
+              `${msg.replace(/</g, '&lt;')}` +
+              `</p><p style="font:14px system-ui;padding:0 2rem">You can close this tab.</p>`,
+          )
+          tab.document.close()
+        } catch {
+          tab.close()
+        }
       }
-      // Do not open /raven/login — that skips SSO and looks like "auto login failed"
     } finally {
       setOpeningApp(null)
     }

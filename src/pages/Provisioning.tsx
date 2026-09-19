@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
-  chatLoginUrl,
   getAppHandoff,
   getProvisioningStatus,
   isApiConfigured,
@@ -228,36 +227,51 @@ export function Provisioning() {
                 onClick={async () => {
                   const session = readPortalSession()
                   const tenant = status.tenant || session?.org?.tenant || session?.orgs?.[0]?.tenant
-                  const site = status.siteUrl
-                  if (session?.token && tenant && isApiConfigured()) {
+                  if (!(session?.token && tenant && isApiConfigured())) {
+                    window.alert(
+                      'Sign in to the portal first, then open Chat from Home (SSO).',
+                    )
+                    return
+                  }
+                  const tab = window.open('about:blank', '_blank')
+                  if (tab) {
                     try {
-                      const tab = window.open('about:blank', '_blank')
-                      if (tab) {
-                        try {
-                          tab.document.write(
-                            '<!doctype html><title>Signing in…</title><p style="font:15px system-ui;padding:2rem">Signing you in…</p>',
-                          )
-                          tab.document.close()
-                        } catch {
-                          /* ignore */
-                        }
-                      }
-                      const { handoffUrl } = await getAppHandoff({
-                        tenant,
-                        app: 'raven',
-                        path: '/raven',
-                      })
-                      if (tab && !tab.closed) tab.location.replace(handoffUrl)
-                      else window.location.assign(handoffUrl)
-                      return
+                      tab.document.write(
+                        '<!doctype html><title>Signing in…</title>' +
+                          '<p style="font:15px system-ui;padding:2rem">Signing you in…</p>',
+                      )
+                      tab.document.close()
                     } catch {
-                      /* fall through */
+                      /* ignore */
                     }
                   }
-                  const fallback =
-                    status.chatUrl ||
-                    (site ? chatLoginUrl(site) : undefined)
-                  if (fallback) window.location.assign(fallback)
+                  try {
+                    const { handoffUrl } = await getAppHandoff({
+                      tenant,
+                      app: 'raven',
+                      path: '/raven',
+                    })
+                    if (tab && !tab.closed) tab.location.replace(handoffUrl)
+                    else window.location.assign(handoffUrl)
+                  } catch (e) {
+                    const msg =
+                      e instanceof Error
+                        ? e.message
+                        : 'SSO failed. Sync your user on Manage users, then retry.'
+                    if (tab && !tab.closed) {
+                      try {
+                        tab.document.open()
+                        tab.document.write(
+                          `<!doctype html><title>SSO failed</title>` +
+                            `<p style="font:15px system-ui;padding:2rem;color:#b91c1c">${msg.replace(/</g, '&lt;')}</p>`,
+                        )
+                        tab.document.close()
+                      } catch {
+                        tab.close()
+                      }
+                    }
+                    window.alert(msg)
+                  }
                 }}
               >
                 Open Chat

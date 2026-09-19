@@ -353,7 +353,8 @@ export async function getAppHandoff(opts: {
   path?: string
 }): Promise<{ handoffUrl: string; redirectPath?: string; siteUrl?: string }> {
   const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), 45000)
+  // Handoff must not sync; if this takes >15s something is wrong on central
+  const timer = window.setTimeout(() => controller.abort(), 15000)
   try {
     const res = await fetch(authMethodUrl('get_app_handoff'), {
       method: 'POST',
@@ -383,7 +384,7 @@ export async function getAppHandoff(opts: {
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') {
       throw new Error(
-        'Open app timed out — try again (or Sync the user on Manage users first).',
+        'Open app timed out. On Manage users, Sync your account until it says Synced, then try again.',
       )
     }
     throw e
