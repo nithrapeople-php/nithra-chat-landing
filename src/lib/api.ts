@@ -353,8 +353,8 @@ export async function getAppHandoff(opts: {
   path?: string
 }): Promise<{ handoffUrl: string; redirectPath?: string; siteUrl?: string }> {
   const controller = new AbortController()
-  // Handoff must not sync; if this takes >15s something is wrong on central
-  const timer = window.setTimeout(() => controller.abort(), 15000)
+  // Should be near-instant on 0.6.10+ (no sync). Abort early so the blank tab errors out.
+  const timer = window.setTimeout(() => controller.abort(), 10000)
   try {
     const res = await fetch(authMethodUrl('get_app_handoff'), {
       method: 'POST',
